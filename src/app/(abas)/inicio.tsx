@@ -1,10 +1,11 @@
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { FlatList, Pressable, ScrollView, Text, View } from 'react-native';
+import { FlatList, ScrollView, Text, View } from 'react-native';
 import { Botao, estilos, Miniatura, Vazio } from '@/components/ui';
 import { abrirItem } from '@/lib/navegar';
 import { continuarAssistindo, favoritos, listas, type ItemLista, type Playlist } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 function Linha({ titulo, itens }: { titulo: string; itens: ItemLista[] }) {
   if (itens.length === 0) return null;
@@ -21,7 +22,7 @@ function Linha({ titulo, itens }: { titulo: string; itens: ItemLista[] }) {
           const poster = item.tipo !== 'live';
           const w = poster ? 110 : 140;
           return (
-            <Pressable onPress={() => abrirItem(item)} style={() => [{ width: w }]}>
+            <Toque onPress={() => abrirItem(item)} style={() => [{ width: w }]}>
               <Miniatura uri={item.imagem} nome={item.titulo} largura={w} altura={poster ? 165 : 80} />
               {item.progresso ? (
                 <View style={{ height: 3, backgroundColor: cores.borda, marginTop: 4 }}>
@@ -37,7 +38,7 @@ function Linha({ titulo, itens }: { titulo: string; itens: ItemLista[] }) {
               <Text numberOfLines={2} style={{ color: cores.texto, fontSize: 12, marginTop: 4 }}>
                 {item.titulo}
               </Text>
-            </Pressable>
+            </Toque>
           );
         }}
       />
@@ -79,14 +80,14 @@ export default function Inicio() {
             ['Séries', totais.series, '/series'],
           ] as const
         ).map(([rotulo, n, rota]) => (
-          <Pressable
+          <Toque
             key={rota}
             onPress={() => router.navigate(rota)}
             style={() => [{ flex: 1, backgroundColor: cores.superficie, borderRadius: 12, padding: 14 }]}
           >
             <Text style={{ color: cores.destaque, fontSize: 20, fontWeight: '700' }}>{n.toLocaleString('pt-BR')}</Text>
             <Text style={{ color: cores.textoFraco }}>{rotulo}</Text>
-          </Pressable>
+          </Toque>
         ))}
       </View>
 

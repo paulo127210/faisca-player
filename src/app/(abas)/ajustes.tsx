@@ -107,7 +107,7 @@ export default function Ajustes() {
       />
 
       <Text style={[estilos.subtitulo, { fontSize: 12, textAlign: 'center', marginTop: espaco.g }]}>
-        Faísca Player 0.2 · o app não fornece canais, apenas reproduz as suas listas.
+        Faísca Player 1.0 · o app não fornece canais, apenas reproduz as suas listas.
       </Text>
     </ScrollView>
   );

@@ -2,7 +2,7 @@
   "expo": {
     "name": "Faísca Player",
     "slug": "faisca-player",
-    "version": "0.2.0",
+    "version": "1.0.0",
     "orientation": "default",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "dark",
@@ -17,13 +17,14 @@
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#0E0F13",
+        "backgroundColor": "#FF7A1A",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "br.com.pcnanocel.faiscaplayer"
+      "package": "br.com.pcnanocel.faiscaplayer",
+      "versionCode": 1
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -47,7 +48,8 @@
             "usesCleartextTraffic": true
           }
         }
-      ]
+      ],
+      "./plugins/withAndroidTV"
     ],
     "scheme": "faiscaplayer",
     "backgroundColor": "#0E0F13",

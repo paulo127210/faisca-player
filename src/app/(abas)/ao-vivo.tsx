@@ -2,12 +2,13 @@ import { Ionicons } from '@expo/vector-icons';
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { useCategoriaProtegida } from '@/components/Pin';
 import { Carregando, Chips, estilos, Miniatura, Vazio } from '@/components/ui';
 import { estaLiberado } from '@/lib/parental';
 import { alternarFavorito, canais, categorias, favoritos, type Canal, type Categoria } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 export default function AoVivo() {
   const [cats, setCats] = useState<Categoria[] | null>(null);
@@ -75,7 +76,7 @@ export default function AoVivo() {
           extraData={favs}
           contentContainerStyle={{ paddingBottom: espaco.g }}
           renderItem={({ item, index }) => (
-            <Pressable
+            <Toque
               onPress={() => router.push({ pathname: '/player', params: { tipo: 'live', id: String(item.id) } })}
               style={({ pressed }) => [
                 {
@@ -102,14 +103,14 @@ export default function AoVivo() {
                   </Text>
                 ) : null}
               </View>
-              <Pressable onPress={() => favoritar(item)} hitSlop={10} accessibilityLabel="Favoritar">
+              <Toque onPress={() => favoritar(item)} hitSlop={10} accessibilityLabel="Favoritar">
                 <Ionicons
                   name={favs.has(item.chave) ? 'star' : 'star-outline'}
                   size={22}
                   color={favs.has(item.chave) ? cores.destaque : cores.textoFraco}
                 />
-              </Pressable>
-            </Pressable>
+              </Toque>
+            </Toque>
           )}
           ListEmptyComponent={<Vazio icone="search-outline" titulo="Nada nesta categoria" />}
         />

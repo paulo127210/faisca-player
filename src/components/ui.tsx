@@ -2,17 +2,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import type { ComponentProps, ReactNode } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-  type TextInputProps,
-} from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, TextInput, View, type TextInputProps } from 'react-native';
 import { cores, espaco, raio } from '@/lib/tema';
+import { Toque } from './Toque';
 
 export type NomeIcone = ComponentProps<typeof Ionicons>['name'];
 
@@ -26,7 +18,7 @@ export function Botao(props: {
   const { variante = 'principal' } = props;
   const fundo = variante === 'principal' ? cores.destaque : variante === 'perigo' ? cores.erro : cores.superficie2;
   return (
-    <Pressable
+    <Toque
       accessibilityRole="button"
       onPress={props.aoTocar}
       disabled={props.desativado}
@@ -37,7 +29,7 @@ export function Botao(props: {
     >
       {props.icone && <Ionicons name={props.icone} size={18} color={cores.texto} />}
       <Text style={estilos.botaoTexto}>{props.titulo}</Text>
-    </Pressable>
+    </Toque>
   );
 }
 
@@ -135,7 +127,7 @@ export function Chips<T extends { id: number | null; nome: string; bloqueada?: n
       style={{ flexGrow: 0 }}
     >
       {itens.map((c) => (
-        <Pressable
+        <Toque
           key={String(c.id)}
           onPress={() => aoEscolher(c.id, !!c.bloqueada)}
           style={() => [estilos.chip, c.id === ativo && estilos.chipAtivo, { flexDirection: 'row', gap: 6 }]}
@@ -146,7 +138,7 @@ export function Chips<T extends { id: number | null; nome: string; bloqueada?: n
           <Text numberOfLines={1} style={[estilos.chipTexto, c.id === ativo && { color: '#fff' }]}>
             {c.nome}
           </Text>
-        </Pressable>
+        </Toque>
       ))}
     </ScrollView>
   );

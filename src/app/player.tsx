@@ -9,7 +9,7 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, Text, View } from 'react-native';
 import { Botao } from '@/components/ui';
 import { urlParaTocar } from '@/lib/listas';
 import {
@@ -22,6 +22,7 @@ import {
   type Programa,
 } from '@/lib/repo';
 import { cores } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 const MAX_TENTATIVAS = 3;
 
@@ -144,9 +145,9 @@ export default function Player() {
       />
 
       <View style={s.barra} pointerEvents="box-none">
-        <Pressable onPress={() => router.back()} hitSlop={12} style={s.icone} accessibilityLabel="Voltar">
+        <Toque onPress={() => router.back()} hitSlop={12} style={s.icone} accessibilityLabel="Voltar">
           <Ionicons name="arrow-back" size={26} color="#fff" />
-        </Pressable>
+        </Toque>
         <View style={{ flex: 1 }}>
           <Text numberOfLines={1} style={s.titulo}>
             {item?.titulo ?? ''}
@@ -161,16 +162,16 @@ export default function Player() {
         {ehAoVivo ? (
           <>
             {grade.length > 0 ? (
-              <Pressable onPress={() => setVerGuia((v) => !v)} hitSlop={12} style={s.icone} accessibilityLabel="Guia">
+              <Toque onPress={() => setVerGuia((v) => !v)} hitSlop={12} style={s.icone} accessibilityLabel="Guia">
                 <Ionicons name={verGuia ? 'close' : 'list'} size={24} color="#fff" />
-              </Pressable>
+              </Toque>
             ) : null}
-            <Pressable onPress={() => trocarCanal(-1)} hitSlop={12} style={s.icone} accessibilityLabel="Canal anterior">
+            <Toque onPress={() => trocarCanal(-1)} hitSlop={12} style={s.icone} accessibilityLabel="Canal anterior">
               <Ionicons name="chevron-up" size={26} color="#fff" />
-            </Pressable>
-            <Pressable onPress={() => trocarCanal(1)} hitSlop={12} style={s.icone} accessibilityLabel="Próximo canal">
+            </Toque>
+            <Toque onPress={() => trocarCanal(1)} hitSlop={12} style={s.icone} accessibilityLabel="Próximo canal">
               <Ionicons name="chevron-down" size={26} color="#fff" />
-            </Pressable>
+            </Toque>
           </>
         ) : null}
       </View>

@@ -1,10 +1,11 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, SectionList, Text, View } from 'react-native';
+import { SectionList, Text, View } from 'react-native';
 import { Botao, Carregando, estilos, Miniatura, Vazio } from '@/components/ui';
 import { carregarEpisodiosXtream } from '@/lib/listas';
 import { alternarFavorito, ehFavorito, episodios, serie, type Episodio, type Serie } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 export default function DetalheSerie() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -71,7 +72,7 @@ export default function DetalheSerie() {
           <Text style={[estilos.secao, { marginTop: espaco.m }]}>{section.title}</Text>
         )}
         renderItem={({ item }) => (
-          <Pressable
+          <Toque
             onPress={() => router.push({ pathname: '/player', params: { tipo: 'episodio', id: String(item.id) } })}
             style={({ pressed }) => [
               { paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: cores.borda, opacity: pressed ? 0.7 : 1 },
@@ -81,7 +82,7 @@ export default function DetalheSerie() {
               {item.numero > 0 ? `${item.numero}. ` : ''}
               {item.titulo}
             </Text>
-          </Pressable>
+          </Toque>
         )}
         ListEmptyComponent={
           eps !== null ? (

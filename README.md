@@ -2,7 +2,7 @@
 
 Player de IPTV para Android (e futuramente iOS e Android TV). O app não vende nem inclui canais: ele só reproduz listas M3U ou Xtream que o próprio usuário cadastra.
 
-Versão atual: **0.2.0** (etapas 1, 2, 3 e 5 concluídas; etapa 4 em parte).
+Versão atual: **1.0.0** (etapas 1 a 6 concluídas; o player VLC reserva ficou para uma próxima versão).
 
 ## O que é necessário para funcionar
 
@@ -15,6 +15,10 @@ Versão atual: **0.2.0** (etapas 1, 2, 3 e 5 concluídas; etapa 4 em parte).
    `https://iptv-org.github.io/iptv/countries/br.m3u`
 
 ### Para gerar o APK instalável
+
+O jeito principal é automático: a cada envio para a branch `main` do GitHub, o arquivo `.github/workflows/apk-android.yml` roda os testes, compila o APK nos servidores do GitHub e publica o arquivo na página **Releases** do repositório, pronto para baixar no celular. Não precisa de conta Expo nem de Android Studio.
+
+Também é possível gerar pela Expo (EAS):
 
 5. **Conta gratuita na Expo** ([expo.dev](https://expo.dev)). O APK é compilado na nuvem da Expo, sem precisar do Android Studio.
 6. Rodar `npx eas-cli@latest build -p android --profile preview` (o primeiro build pede login e cria o projeto na conta).
@@ -65,6 +69,9 @@ npm run typecheck   # TypeScript sem erros
   - O desbloqueio vale até fechar o app ou tocar em "Bloquear agora". Depois de 5 PINs errados, espera 30 segundos.
   - As escolhas de bloqueio continuam depois de atualizar a lista.
 
+- **Android TV, Google TV e Fire Stick:** o APK aparece no menu da TV, não exige tela de toque e todos os botões e listas mostram destaque quando recebem foco do controle remoto.
+- Ícone próprio (faísca branca em fundo laranja).
+
 ## Segurança
 
 - Senha Xtream e link M3U ficam só no cofre do sistema (expo-secure-store: Keystore no Android, Keychain no iOS).
@@ -97,7 +104,7 @@ tests/                 testes automáticos (Vitest)
 
 ## Próximas etapas
 
-- Etapa 4 (restante): player VLC reserva para formatos que o nativo não abre (RTMP, UDP).
-- Etapa 6: layout para TV com controle remoto (react-native-tvos) e geração do APK.
+- Player VLC reserva para formatos que o nativo não abre (RTMP, UDP). Exige build de desenvolvimento.
+- Versão 1.1: perfis, backup na nuvem (Supabase) e guia em grade completa.
 
 O histórico de mudanças está em `CHANGELOG.md`.

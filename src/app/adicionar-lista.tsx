@@ -2,11 +2,12 @@ import * as DocumentPicker from 'expo-document-picker';
 import { File } from 'expo-file-system';
 import { router } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { Botao, Campo, Carregando, estilos } from '@/components/ui';
 import type { Progresso } from '@/lib/importador';
 import { adicionarLista, type NovaLista } from '@/lib/listas';
 import { cores, espaco, raio } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 type Aba = 'link' | 'arquivo' | 'xtream';
 
@@ -95,7 +96,7 @@ export default function AdicionarLista() {
               ['xtream', 'Xtream'],
             ] as [Aba, string][]
           ).map(([id, rotulo]) => (
-            <Pressable
+            <Toque
               key={id}
               onPress={() => setAba(id)}
               style={() => [
@@ -104,7 +105,7 @@ export default function AdicionarLista() {
               ]}
             >
               <Text style={{ color: aba === id ? '#fff' : cores.textoFraco, fontWeight: '600' }}>{rotulo}</Text>
-            </Pressable>
+            </Toque>
           ))}
         </View>
 

@@ -1,0 +1,77 @@
+# Compila o APK do Faísca Player nos servidores do GitHub e publica para download.
+# Roda a cada envio para a branch main e também pelo botão "Run workflow" na aba Actions.
+name: APK Android
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-android
+  cancel-in-progress: true
+
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+
+      - uses: gradle/actions/setup-gradle@v4
+
+      - name: Instalar dependências
+        run: npm ci
+
+      - name: Testes automáticos
+        run: npm test
+
+      - name: Verificar tipos
+        run: npx tsc --noEmit
+
+      - name: Gerar projeto Android
+        run: npx expo prebuild --platform android --no-install
+        env:
+          CI: 1
+
+      - name: Compilar APK
+        working-directory: android
+        run: ./gradlew assembleRelease --no-daemon -PreactNativeArchitectures=armeabi-v7a,arm64-v8a
+
+      - name: Nomear o APK
+        id: apk
+        run: |
+          VERSAO=$(node -p "require('./app.json').expo.version")
+          ARQ="faisca-player-$VERSAO.apk"
+          cp android/app/build/outputs/apk/release/app-release.apk "$ARQ"
+          echo "arquivo=$ARQ" >> "$GITHUB_OUTPUT"
+          echo "versao=$VERSAO" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.apk.outputs.arquivo }}
+          path: ${{ steps.apk.outputs.arquivo }}
+
+      - name: Publicar no GitHub (link de download)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.apk.outputs.versao }}-build${{ github.run_number }}
+          name: Faísca Player ${{ steps.apk.outputs.versao }} (build ${{ github.run_number }})
+          body: |
+            APK para teste. No celular Android, baixe o arquivo .apk abaixo e toque nele para instalar.
+            Se o Android pedir, permita "instalar apps desta fonte".
+          files: ${{ steps.apk.outputs.arquivo }}
+          make_latest: true

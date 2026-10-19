@@ -1,10 +1,11 @@
 import { FlashList } from '@shopify/flash-list';
 import { useEffect, useState } from 'react';
-import { Pressable, Text, View } from 'react-native';
+import { Text, View } from 'react-native';
 import { Campo, estilos, Miniatura, Vazio } from '@/components/ui';
 import { abrirItem } from '@/lib/navegar';
 import { buscar, type ItemLista } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
+import { Toque } from '@/components/Toque';
 
 const ROTULO = { live: 'Canal', filme: 'Filme', serie: 'Série' } as const;
 
@@ -37,7 +38,7 @@ export default function Busca() {
         keyExtractor={(i) => `${i.tipo}-${i.id}`}
         keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
-          <Pressable
+          <Toque
             onPress={() => abrirItem(item)}
             style={() => [
               { flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: espaco.m, paddingVertical: 8 },
@@ -50,7 +51,7 @@ export default function Busca() {
               </Text>
               <Text style={{ color: cores.textoFraco, fontSize: 12 }}>{ROTULO[item.tipo]}</Text>
             </View>
-          </Pressable>
+          </Toque>
         )}
         ListEmptyComponent={texto.trim().length >= 2 ? <Vazio icone="search-outline" titulo="Nada encontrado" /> : null}
       />

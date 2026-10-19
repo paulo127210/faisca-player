@@ -2,12 +2,13 @@
 import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Text, useWindowDimensions, View } from 'react-native';
 import { categorias, filmes, series, type Categoria, type Filme } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
 import { estaLiberado } from '@/lib/parental';
 import { useCategoriaProtegida } from './Pin';
 import { Carregando, Chips, estilos, Miniatura, Vazio } from './ui';
+import { Toque } from './Toque';
 
 export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
   const { width } = useWindowDimensions();
@@ -65,7 +66,7 @@ export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
           keyExtractor={(i) => String(i.id)}
           contentContainerStyle={{ paddingHorizontal: espaco.m, paddingBottom: espaco.g }}
           renderItem={({ item }) => (
-            <Pressable
+            <Toque
               onPress={() => router.push(tipo === 'filme' ? `/filme/${item.id}` : `/serie/${item.id}`)}
               style={() => [{ width: larguraCapa, marginBottom: espaco.m }]}
             >
@@ -73,7 +74,7 @@ export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
               <Text numberOfLines={2} style={{ color: cores.texto, fontSize: 12, marginTop: 4 }}>
                 {item.titulo}
               </Text>
-            </Pressable>
+            </Toque>
           )}
           ListEmptyComponent={<Vazio icone="search-outline" titulo="Nada nesta categoria" />}
         />
