@@ -22,7 +22,12 @@ export default function Ajustes() {
     setProgresso({ etapa: 'Começando', feitos: 0 });
     try {
       const r = await atualizarLista(p, setProgresso);
-      Alert.alert('Lista atualizada', `${r.live} canais, ${r.filmes} filmes e ${r.series} séries.`);
+      const guia = r.guia
+        ? `\nGuia: ${r.guia.programas.toLocaleString('pt-BR')} programas em ${r.guia.canaisComGuia} canais.`
+        : r.erroGuia
+          ? `\nGuia não atualizado: ${r.erroGuia}`
+          : '';
+      Alert.alert('Lista atualizada', `${r.live} canais, ${r.filmes} filmes e ${r.series} séries.${guia}`);
     } catch (e) {
       Alert.alert('Não foi possível atualizar', (e as Error).message);
     } finally {
@@ -74,6 +79,14 @@ export default function Ajustes() {
               <Botao titulo="Atualizar" variante="secundario" icone="refresh" aoTocar={() => atualizar(p)} />
             </View>
             <View style={{ flex: 1 }}>
+              <Botao
+                titulo="Editar"
+                variante="secundario"
+                icone="create-outline"
+                aoTocar={() => router.push(`/lista/${p.id}`)}
+              />
+            </View>
+            <View style={{ flex: 1 }}>
               <Botao titulo="Remover" variante="perigo" icone="trash-outline" aoTocar={() => remover(p)} />
             </View>
           </View>
@@ -85,8 +98,16 @@ export default function Ajustes() {
         aoTocar={() => router.push('/adicionar-lista')}
       />
 
+      <Text style={[estilos.secao, { marginTop: espaco.m }]}>Segurança</Text>
+      <Botao
+        titulo="Controle parental"
+        variante="secundario"
+        icone="shield-checkmark-outline"
+        aoTocar={() => router.push('/parental')}
+      />
+
       <Text style={[estilos.subtitulo, { fontSize: 12, textAlign: 'center', marginTop: espaco.g }]}>
-        Faísca Player 0.1 · o app não fornece canais, apenas reproduz as suas listas.
+        Faísca Player 0.2 · o app não fornece canais, apenas reproduz as suas listas.
       </Text>
     </ScrollView>
   );

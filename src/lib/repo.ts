@@ -1,5 +1,7 @@
 /** Consultas usadas pelas telas. Tudo lê do banco local. */
 import { obterBanco } from './db';
+import { idGuiaSQL } from './epg';
+import { esconderBloqueados } from './parental';
 import { normalizar, type TipoConteudo } from './texto';
 
 export const PERFIL = 1; // perfis múltiplos chegam na versão 1.1
@@ -20,6 +22,7 @@ export interface Categoria {
   id: number;
   nome: string;
   total: number;
+  bloqueada: number;
 }
 export interface Canal {
   id: number;
@@ -27,6 +30,8 @@ export interface Canal {
   logo: string | null;
   numero: number | null;
   chave: string;
+  /** Programa no ar agora, quando a lista tem guia */
+  agora: string | null;
 }
 export interface Filme {
   id: number;
@@ -61,8 +66,27 @@ export interface ItemLista {
   chave: string;
   progresso?: number;
 }
+export interface Programa {
+  id: number;
+  titulo: string;
+  descricao: string | null;
+  inicio: number;
+  fim: number;
+}
 
 const TABELA = { live: 'canal', filme: 'filme', serie: 'serie' } as const;
+const agoraSeg = () => Math.floor(Date.now() / 1000);
+
+/** Trecho SQL que tira itens de categorias bloqueadas (tabela com apelido x) */
+async function filtroParental(): Promise<string> {
+  return (await esconderBloqueados())
+    ? 'AND NOT EXISTS (SELECT 1 FROM categoria k WHERE k.id = x.categoria_id AND k.bloqueada = 1)'
+    : '';
+}
+
+/** Junta o canal (apelido x) ao programa no ar */
+const JUNTA_AGORA = `LEFT JOIN programa_epg p ON p.playlist_id = x.playlist_id
+  AND p.epg_id = ${idGuiaSQL('x.epg_id')} AND p.inicio <= ? AND p.fim > ?`;
 
 export async function listas(): Promise<Playlist[]> {
   const db = await obterBanco();
@@ -73,7 +97,7 @@ export async function categorias(tipo: TipoConteudo): Promise<Categoria[]> {
   const db = await obterBanco();
   const t = TABELA[tipo];
   return db.getAllAsync<Categoria>(
-    `SELECT c.id, c.nome, COUNT(x.id) AS total FROM categoria c
+    `SELECT c.id, c.nome, c.bloqueada, COUNT(x.id) AS total FROM categoria c
      JOIN ${t} x ON x.categoria_id = c.id
      WHERE c.tipo = ? AND c.oculta = 0
      GROUP BY c.id ORDER BY c.playlist_id, c.ordem`,
@@ -81,35 +105,51 @@ export async function categorias(tipo: TipoConteudo): Promise<Categoria[]> {
   );
 }
 
+/** Todas as categorias de um tipo, inclusive ocultas (tela de controle parental) */
+export async function todasCategorias(): Promise<(Categoria & { tipo: TipoConteudo })[]> {
+  const db = await obterBanco();
+  return db.getAllAsync(
+    `SELECT id, nome, tipo, bloqueada, 0 AS total FROM categoria ORDER BY bloqueada DESC, tipo, playlist_id, ordem`,
+    [],
+  );
+}
+
 export async function canais(categoriaId: number | null): Promise<Canal[]> {
   const db = await obterBanco();
-  return categoriaId === null
-    ? db.getAllAsync<Canal>(
-        `SELECT x.id, x.nome, x.logo, x.numero, x.chave FROM canal x
-         LEFT JOIN categoria c ON c.id = x.categoria_id WHERE COALESCE(c.oculta, 0) = 0 ORDER BY x.id`,
-        [],
-      )
-    : db.getAllAsync<Canal>(
-        'SELECT id, nome, logo, numero, chave FROM canal WHERE categoria_id = ? ORDER BY COALESCE(numero, 999999), id',
-        [categoriaId],
-      );
-}
-
-export async function filmes(categoriaId: number | null): Promise<Filme[]> {
-  const db = await obterBanco();
-  return db.getAllAsync<Filme>(
-    `SELECT id, titulo, capa, ano, chave FROM filme ${categoriaId === null ? '' : 'WHERE categoria_id = ?'} ORDER BY id DESC`,
-    categoriaId === null ? [] : [categoriaId],
+  const t = agoraSeg();
+  if (categoriaId === null) {
+    const filtro = await filtroParental();
+    return db.getAllAsync<Canal>(
+      `SELECT x.id, x.nome, x.logo, x.numero, x.chave, MIN(p.titulo) AS agora FROM canal x ${JUNTA_AGORA}
+       LEFT JOIN categoria c ON c.id = x.categoria_id
+       WHERE COALESCE(c.oculta, 0) = 0 ${filtro} GROUP BY x.id ORDER BY x.id`,
+      [t, t],
+    );
+  }
+  return db.getAllAsync<Canal>(
+    `SELECT x.id, x.nome, x.logo, x.numero, x.chave, MIN(p.titulo) AS agora FROM canal x ${JUNTA_AGORA}
+     WHERE x.categoria_id = ? GROUP BY x.id ORDER BY COALESCE(x.numero, 999999), x.id`,
+    [t, t, categoriaId],
   );
 }
 
-export async function series(categoriaId: number | null): Promise<Filme[]> {
+async function catalogo(tabela: 'filme' | 'serie', categoriaId: number | null): Promise<Filme[]> {
   const db = await obterBanco();
+  if (categoriaId !== null)
+    return db.getAllAsync<Filme>(
+      `SELECT id, titulo, capa, ano, chave FROM ${tabela} WHERE categoria_id = ? ORDER BY id DESC`,
+      [categoriaId],
+    );
+  const filtro = await filtroParental();
   return db.getAllAsync<Filme>(
-    `SELECT id, titulo, capa, ano, chave FROM serie ${categoriaId === null ? '' : 'WHERE categoria_id = ?'} ORDER BY id DESC`,
-    categoriaId === null ? [] : [categoriaId],
+    `SELECT x.id, x.titulo, x.capa, x.ano, x.chave FROM ${tabela} x
+     LEFT JOIN categoria c ON c.id = x.categoria_id
+     WHERE COALESCE(c.oculta, 0) = 0 ${filtro} ORDER BY x.id DESC`,
+    [],
   );
 }
+export const filmes = (categoriaId: number | null) => catalogo('filme', categoriaId);
+export const series = (categoriaId: number | null) => catalogo('serie', categoriaId);
 
 export async function serie(id: number): Promise<Serie | null> {
   const db = await obterBanco();
@@ -155,6 +195,20 @@ export async function canalVizinho(id: number, direcao: 1 | -1): Promise<number 
   return r?.id ?? null;
 }
 
+/* ---------------------------- Guia (EPG) ---------------------------- */
+
+/** Programação do canal a partir do programa no ar (até 24 h à frente) */
+export async function guiaDoCanal(canalId: number): Promise<Programa[]> {
+  const db = await obterBanco();
+  const t = agoraSeg();
+  return db.getAllAsync<Programa>(
+    `SELECT p.id, p.titulo, p.descricao, p.inicio, p.fim FROM canal x
+     JOIN programa_epg p ON p.playlist_id = x.playlist_id AND p.epg_id = ${idGuiaSQL('x.epg_id')}
+     WHERE x.id = ? AND p.fim > ? AND p.inicio < ? ORDER BY p.inicio LIMIT 40`,
+    [canalId, t, t + 24 * 3600],
+  );
+}
+
 /* ------------------------------ Favoritos ------------------------------ */
 
 export async function ehFavorito(chave: string): Promise<boolean> {
@@ -175,16 +229,17 @@ export async function alternarFavorito(chave: string, tipo: TipoConteudo): Promi
 /** Favoritos ligados ao conteúdo atual pela chave (sobrevivem à troca de link) */
 export async function favoritos(): Promise<ItemLista[]> {
   const db = await obterBanco();
+  const filtro = await filtroParental();
   return db.getAllAsync<ItemLista>(
     `SELECT * FROM (
-       SELECT 'live' AS tipo, MIN(c.id) AS id, c.nome AS titulo, c.logo AS imagem, f.chave, f.criado_em
-         FROM favorito f JOIN canal c ON c.chave = f.chave WHERE f.perfil_id = ? GROUP BY f.chave
+       SELECT 'live' AS tipo, MIN(x.id) AS id, x.nome AS titulo, x.logo AS imagem, f.chave, f.criado_em
+         FROM favorito f JOIN canal x ON x.chave = f.chave WHERE f.perfil_id = ? ${filtro} GROUP BY f.chave
        UNION ALL
        SELECT 'filme', MIN(x.id), x.titulo, x.capa, f.chave, f.criado_em
-         FROM favorito f JOIN filme x ON x.chave = f.chave WHERE f.perfil_id = ? GROUP BY f.chave
+         FROM favorito f JOIN filme x ON x.chave = f.chave WHERE f.perfil_id = ? ${filtro} GROUP BY f.chave
        UNION ALL
        SELECT 'serie', MIN(x.id), x.titulo, x.capa, f.chave, f.criado_em
-         FROM favorito f JOIN serie x ON x.chave = f.chave WHERE f.perfil_id = ? GROUP BY f.chave
+         FROM favorito f JOIN serie x ON x.chave = f.chave WHERE f.perfil_id = ? ${filtro} GROUP BY f.chave
      ) ORDER BY criado_em DESC`,
     [PERFIL, PERFIL, PERFIL],
   );
@@ -223,14 +278,17 @@ export async function posicaoSalva(chave: string): Promise<number> {
 /** "Continuar assistindo": filmes começados e canais vistos por último */
 export async function continuarAssistindo(): Promise<ItemLista[]> {
   const db = await obterBanco();
+  const filtro = await filtroParental();
   return db.getAllAsync<ItemLista>(
     `SELECT * FROM (
-       SELECT 'live' AS tipo, MIN(c.id) AS id, c.nome AS titulo, c.logo AS imagem, h.chave, NULL AS progresso, h.assistido_em
-         FROM historico h JOIN canal c ON c.chave = h.chave WHERE h.perfil_id = ? AND h.tipo = 'live' GROUP BY h.chave
+       SELECT 'live' AS tipo, MIN(x.id) AS id, x.nome AS titulo, x.logo AS imagem, h.chave, NULL AS progresso, h.assistido_em
+         FROM historico h JOIN canal x ON x.chave = h.chave
+         WHERE h.perfil_id = ? AND h.tipo = 'live' ${filtro} GROUP BY h.chave
        UNION ALL
        SELECT 'filme', MIN(x.id), x.titulo, x.capa, h.chave, h.posicao_seg * 1.0 / h.duracao_seg, h.assistido_em
          FROM historico h JOIN filme x ON x.chave = h.chave
-         WHERE h.perfil_id = ? AND h.duracao_seg > 0 AND h.posicao_seg * 1.0 / h.duracao_seg < 0.95 GROUP BY h.chave
+         WHERE h.perfil_id = ? AND h.duracao_seg > 0 AND h.posicao_seg * 1.0 / h.duracao_seg < 0.95 ${filtro}
+         GROUP BY h.chave
      ) ORDER BY assistido_em DESC LIMIT 20`,
     [PERFIL, PERFIL],
   );
@@ -242,11 +300,33 @@ export async function buscar(texto: string): Promise<ItemLista[]> {
   const termo = normalizar(texto);
   if (termo.length < 2) return [];
   const db = await obterBanco();
+  const filtro = await filtroParental();
   const like = `%${termo}%`;
   return db.getAllAsync<ItemLista>(
-    `SELECT * FROM (SELECT 'live' AS tipo, id, nome AS titulo, logo AS imagem, chave FROM canal WHERE nome_busca LIKE ? LIMIT 60)
-     UNION ALL SELECT * FROM (SELECT 'filme', id, titulo, capa, chave FROM filme WHERE nome_busca LIKE ? LIMIT 60)
-     UNION ALL SELECT * FROM (SELECT 'serie', id, titulo, capa, chave FROM serie WHERE nome_busca LIKE ? LIMIT 60)`,
+    `SELECT * FROM (SELECT 'live' AS tipo, x.id, x.nome AS titulo, x.logo AS imagem, x.chave FROM canal x
+                    WHERE x.nome_busca LIKE ? ${filtro} LIMIT 60)
+     UNION ALL SELECT * FROM (SELECT 'filme', x.id, x.titulo, x.capa, x.chave FROM filme x
+                    WHERE x.nome_busca LIKE ? ${filtro} LIMIT 60)
+     UNION ALL SELECT * FROM (SELECT 'serie', x.id, x.titulo, x.capa, x.chave FROM serie x
+                    WHERE x.nome_busca LIKE ? ${filtro} LIMIT 60)`,
     [like, like, like],
+  );
+}
+
+/* ---------------------------- Configurações ---------------------------- */
+
+export async function lerConfig(chave: string): Promise<string | null> {
+  const db = await obterBanco();
+  return (
+    (await db.getFirstAsync<{ valor: string | null }>('SELECT valor FROM config WHERE chave = ?', [chave]))?.valor ??
+    null
+  );
+}
+
+export async function gravarConfig(chave: string, valor: string) {
+  const db = await obterBanco();
+  await db.runAsync(
+    'INSERT INTO config (chave, valor) VALUES (?, ?) ON CONFLICT (chave) DO UPDATE SET valor = excluded.valor',
+    [chave, valor],
   );
 }

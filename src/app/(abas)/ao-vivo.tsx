@@ -3,7 +3,9 @@ import { FlashList } from '@shopify/flash-list';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { Pressable, Text, View } from 'react-native';
+import { useCategoriaProtegida } from '@/components/Pin';
 import { Carregando, Chips, estilos, Miniatura, Vazio } from '@/components/ui';
+import { estaLiberado } from '@/lib/parental';
 import { alternarFavorito, canais, categorias, favoritos, type Canal, type Categoria } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
 
@@ -12,6 +14,7 @@ export default function AoVivo() {
   const [ativa, setAtiva] = useState<number | null>(null);
   const [lista, setLista] = useState<Canal[] | null>(null);
   const [favs, setFavs] = useState<Set<string>>(new Set());
+  const { escolher, janela, versao } = useCategoriaProtegida(setAtiva);
 
   useFocusEffect(
     useCallback(() => {
@@ -21,12 +24,17 @@ export default function AoVivo() {
       favoritos()
         .then((f) => setFavs(new Set(f.map((x) => x.chave))))
         .catch(() => {});
-    }, []),
+    }, [versao]),
   );
 
   useFocusEffect(
     useCallback(() => {
       let vivo = true;
+      // bloquearam de novo enquanto uma categoria bloqueada estava aberta: volta para "Todos"
+      if (ativa !== null && !estaLiberado() && cats?.find((c) => c.id === ativa)?.bloqueada) {
+        setAtiva(null);
+        return;
+      }
       setLista(null);
       canais(ativa)
         .then((r) => vivo && setLista(r))
@@ -34,7 +42,7 @@ export default function AoVivo() {
       return () => {
         vivo = false;
       };
-    }, [ativa]),
+    }, [ativa, versao]),
   );
 
   const favoritar = async (c: Canal) => {
@@ -56,7 +64,8 @@ export default function AoVivo() {
 
   return (
     <View style={estilos.tela}>
-      <Chips itens={[{ id: null, nome: 'Todos' }, ...(cats ?? [])]} ativo={ativa} aoEscolher={setAtiva} />
+      {janela}
+      <Chips itens={[{ id: null, nome: 'Todos' }, ...(cats ?? [])]} ativo={ativa} aoEscolher={escolher} />
       {lista === null ? (
         <Carregando />
       ) : (
@@ -83,9 +92,16 @@ export default function AoVivo() {
                 {item.numero ?? index + 1}
               </Text>
               <Miniatura uri={item.logo} nome={item.nome} largura={64} altura={40} />
-              <Text numberOfLines={1} style={{ color: cores.texto, fontSize: 15, flex: 1 }}>
-                {item.nome}
-              </Text>
+              <View style={{ flex: 1 }}>
+                <Text numberOfLines={1} style={{ color: cores.texto, fontSize: 15 }}>
+                  {item.nome}
+                </Text>
+                {item.agora ? (
+                  <Text numberOfLines={1} style={{ color: cores.textoFraco, fontSize: 12, marginTop: 2 }}>
+                    Agora: {item.agora}
+                  </Text>
+                ) : null}
+              </View>
               <Pressable onPress={() => favoritar(item)} hitSlop={10} accessibilityLabel="Favoritar">
                 <Ionicons
                   name={favs.has(item.chave) ? 'star' : 'star-outline'}

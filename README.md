@@ -2,7 +2,7 @@
 
 Player de IPTV para Android (e futuramente iOS e Android TV). O app não vende nem inclui canais: ele só reproduz listas M3U ou Xtream que o próprio usuário cadastra.
 
-Versão atual: **0.1.0** (etapas 1 a 3 do projeto concluídas e parte da etapa 4).
+Versão atual: **0.2.0** (etapas 1, 2, 3 e 5 concluídas; etapa 4 em parte).
 
 ## O que é necessário para funcionar
 
@@ -42,7 +42,7 @@ Abra o Expo Go no celular e leia o QR Code que aparece no terminal.
 Testes automáticos e verificação de tipos:
 
 ```bash
-npm test            # 18 testes: leitor M3U, Xtream, importador, lista real do iptv-org
+npm test            # 35 testes: leitor M3U, Xtream, importador, guia, controle parental e consultas das telas
 npm run typecheck   # TypeScript sem erros
 ```
 
@@ -54,12 +54,22 @@ npm run typecheck   # TypeScript sem erros
 - Telas: Boas-vindas, Adicionar lista, Início, Ao vivo, Filmes, Séries, Detalhe do filme, Episódios da série, Busca e Ajustes.
 - Player nativo (expo-video) com reconexão automática de canal ao vivo (3 tentativas), troca de canal pelas setas, retomada de filmes de onde parou e mensagens de erro em português.
 - Favoritos e "Continuar assistindo" presos a uma chave estável (tipo + nome), que sobrevive à troca de link pelo provedor.
-- Atualizar e remover listas em Ajustes.
+- Atualizar, editar e remover listas em Ajustes.
+- **Guia de programação (EPG)** em XMLTV, compactado (.gz) ou não. O link vem do cabeçalho da lista M3U, do servidor Xtream ou pode ser informado à mão em Ajustes > Editar.
+  - Mostra o programa no ar em cada canal da lista e, no player, o atual, o próximo e a programação do dia.
+  - Canais sem tvg-id são ligados ao guia pelo nome, e ids com sufixo "@HD" também são reconhecidos.
+  - Só guarda de 3 horas atrás até 36 horas à frente, e só dos canais da lista. Atualiza sozinho a cada 12 horas ao abrir o app.
+- **Controle parental** com PIN de 4 a 6 números.
+  - Categorias com nome adulto já entram bloqueadas; as outras podem ser marcadas em Ajustes > Controle parental.
+  - Com PIN, conteúdo bloqueado some de "Todos", da busca, dos favoritos e do "Continuar assistindo", e a categoria pede o PIN para abrir.
+  - O desbloqueio vale até fechar o app ou tocar em "Bloquear agora". Depois de 5 PINs errados, espera 30 segundos.
+  - As escolhas de bloqueio continuam depois de atualizar a lista.
 
 ## Segurança
 
 - Senha Xtream e link M3U ficam só no cofre do sistema (expo-secure-store: Keystore no Android, Keychain no iOS).
 - No banco, as URLs de canais Xtream guardam o marcador `{SENHA}`, trocado pela senha real apenas na hora de tocar.
+- O PIN do controle parental nunca é gravado: só um hash SHA-256 com sal aleatório.
 - O app não envia nenhum dado de uso para fora do aparelho.
 
 ## Estrutura
@@ -68,13 +78,16 @@ npm run typecheck   # TypeScript sem erros
 src/
   app/                 telas (Expo Router: cada arquivo é uma rota)
     (abas)/            Início, Ao vivo, Filmes, Séries, Ajustes
-    adicionar-lista.tsx, boas-vindas.tsx, busca.tsx, player.tsx
+    adicionar-lista.tsx, boas-vindas.tsx, busca.tsx, player.tsx, parental.tsx
+    lista/[id].tsx     editar nome da lista e link do guia
     filme/[id].tsx, serie/[id].tsx
   components/          botões, campos, miniaturas, grade de capas
   lib/
     m3u.ts             leitor de listas M3U
     xtream.ts          cliente da API Xtream Codes
-    banco.ts           esquema do banco e migrações
+    banco.ts           esquema do banco e migrações (versão 2)
+    epg.ts             leitor do guia XMLTV e gravação no banco
+    pin.ts, parental.ts  regras do PIN e controle parental
     importador.ts      grava a lista no banco em lotes
     listas.ts          adicionar, atualizar, remover lista
     repo.ts            consultas das telas
@@ -85,7 +98,6 @@ tests/                 testes automáticos (Vitest)
 ## Próximas etapas
 
 - Etapa 4 (restante): player VLC reserva para formatos que o nativo não abre (RTMP, UDP).
-- Etapa 5: guia de programação (EPG), controle parental com PIN.
 - Etapa 6: layout para TV com controle remoto (react-native-tvos) e geração do APK.
 
 O histórico de mudanças está em `CHANGELOG.md`.

@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Text, View } from 'react-native';
 import { Botao, Carregando, estilos } from '@/components/ui';
 import { obterBanco } from '@/lib/db';
+import { atualizarGuiasAntigos } from '@/lib/listas';
 import { cores } from '@/lib/tema';
 
 const tema = {
@@ -24,7 +25,10 @@ export default function Raiz() {
   const abrir = () => {
     setEstado('abrindo');
     obterBanco()
-      .then(() => setEstado('pronto'))
+      .then(() => {
+        setEstado('pronto');
+        atualizarGuiasAntigos().catch(() => {}); // em segundo plano, sem travar a abertura
+      })
       .catch((e: Error) => setEstado(e.message || 'Erro ao abrir o banco'));
   };
   useEffect(abrir, []);
@@ -62,6 +66,8 @@ export default function Raiz() {
         <Stack.Screen name="busca" options={{ title: 'Buscar' }} />
         <Stack.Screen name="filme/[id]" options={{ title: '' }} />
         <Stack.Screen name="serie/[id]" options={{ title: '' }} />
+        <Stack.Screen name="parental" options={{ title: 'Controle parental' }} />
+        <Stack.Screen name="lista/[id]" options={{ title: 'Editar lista' }} />
         <Stack.Screen name="player" options={{ headerShown: false, animation: 'fade', orientation: 'landscape' }} />
       </Stack>
     </ThemeProvider>

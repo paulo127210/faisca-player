@@ -22,7 +22,7 @@ export interface Banco {
   withTransactionAsync(tarefa: () => Promise<void>): Promise<void>;
 }
 
-const VERSAO = 1;
+const VERSAO = 2;
 
 const ESQUEMA_V1 = `
 PRAGMA foreign_keys = ON;
@@ -153,6 +153,14 @@ CREATE TABLE IF NOT EXISTS config (
 INSERT INTO perfil (id, nome) SELECT 1, 'Principal' WHERE NOT EXISTS (SELECT 1 FROM perfil WHERE id = 1);
 `;
 
+/** Versão 2: controle parental por categoria e guia ligado à lista de origem */
+const ESQUEMA_V2 = `
+ALTER TABLE categoria ADD COLUMN bloqueada INTEGER NOT NULL DEFAULT 0;
+ALTER TABLE programa_epg ADD COLUMN playlist_id INTEGER;
+CREATE INDEX IF NOT EXISTS idx_epg_playlist ON programa_epg(playlist_id);
+CREATE INDEX IF NOT EXISTS idx_epg_agora ON programa_epg(fim, inicio);
+`;
+
 /** Cria ou atualiza as tabelas conforme a versão gravada no próprio banco */
 export async function migrar(db: Banco): Promise<void> {
   await db.execAsync('PRAGMA journal_mode = WAL; PRAGMA foreign_keys = ON;');
@@ -160,6 +168,7 @@ export async function migrar(db: Banco): Promise<void> {
   const atual = linha?.user_version ?? 0;
   if (atual >= VERSAO) return;
   if (atual < 1) await db.execAsync(ESQUEMA_V1);
-  // futuras versões: if (atual < 2) await db.execAsync(ESQUEMA_V2);
+  if (atual < 2) await db.execAsync(ESQUEMA_V2);
+  // futuras versões: if (atual < 3) await db.execAsync(ESQUEMA_V3);
   await db.execAsync(`PRAGMA user_version = ${VERSAO}`);
 }

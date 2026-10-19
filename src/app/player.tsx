@@ -9,10 +9,18 @@ import { router, useLocalSearchParams } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Botao } from '@/components/ui';
 import { urlParaTocar } from '@/lib/listas';
-import { canalVizinho, itemTocavel, posicaoSalva, registrarHistorico, type ItemTocavel } from '@/lib/repo';
+import {
+  canalVizinho,
+  guiaDoCanal,
+  itemTocavel,
+  posicaoSalva,
+  registrarHistorico,
+  type ItemTocavel,
+  type Programa,
+} from '@/lib/repo';
 import { cores } from '@/lib/tema';
 
 const MAX_TENTATIVAS = 3;
@@ -99,6 +107,25 @@ export default function Player() {
   useEventListener(player, 'timeUpdate', salvarProgresso);
   useEffect(() => salvarProgresso, [salvarProgresso]); // salva também ao sair da tela
 
+  // guia do canal: programa atual, próximo e a grade do dia
+  const [grade, setGrade] = useState<Programa[]>([]);
+  const [verGuia, setVerGuia] = useState(false);
+  useEffect(() => {
+    if (!ehAoVivo) return;
+    let vivo = true;
+    const carregar = () =>
+      guiaDoCanal(Number(id))
+        .then((g) => vivo && setGrade(g))
+        .catch(() => {});
+    carregar();
+    const t = setInterval(carregar, 60000); // troca o "agora" quando o programa acaba
+    return () => {
+      vivo = false;
+      clearInterval(t);
+    };
+  }, [id, ehAoVivo]);
+  const [agora, depois] = grade;
+
   const trocarCanal = async (direcao: 1 | -1) => {
     const novo = await canalVizinho(Number(id), direcao);
     if (novo) router.setParams({ id: String(novo) });
@@ -120,11 +147,24 @@ export default function Player() {
         <Pressable onPress={() => router.back()} hitSlop={12} style={s.icone} accessibilityLabel="Voltar">
           <Ionicons name="arrow-back" size={26} color="#fff" />
         </Pressable>
-        <Text numberOfLines={1} style={s.titulo}>
-          {item?.titulo ?? ''}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text numberOfLines={1} style={s.titulo}>
+            {item?.titulo ?? ''}
+          </Text>
+          {agora ? (
+            <Text numberOfLines={1} style={s.programa}>
+              {hora(agora.inicio)} {agora.titulo}
+              {depois ? `   ·   ${hora(depois.inicio)} ${depois.titulo}` : ''}
+            </Text>
+          ) : null}
+        </View>
         {ehAoVivo ? (
           <>
+            {grade.length > 0 ? (
+              <Pressable onPress={() => setVerGuia((v) => !v)} hitSlop={12} style={s.icone} accessibilityLabel="Guia">
+                <Ionicons name={verGuia ? 'close' : 'list'} size={24} color="#fff" />
+              </Pressable>
+            ) : null}
             <Pressable onPress={() => trocarCanal(-1)} hitSlop={12} style={s.icone} accessibilityLabel="Canal anterior">
               <Ionicons name="chevron-up" size={26} color="#fff" />
             </Pressable>
@@ -134,6 +174,30 @@ export default function Player() {
           </>
         ) : null}
       </View>
+
+      {verGuia ? (
+        <View style={s.painel}>
+          <Text style={[s.titulo, { marginBottom: 8 }]}>Programação</Text>
+          <FlatList
+            data={grade}
+            keyExtractor={(p) => String(p.id)}
+            renderItem={({ item: p, index }) => (
+              <View style={{ paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: 'rgba(255,255,255,0.12)' }}>
+                <Text style={{ color: index === 0 ? cores.destaque : '#ddd', fontSize: 12, fontWeight: '600' }}>
+                  {p.inicio <= Date.now() / 1000 ? 'AGORA · ' : ''}
+                  {hora(p.inicio)} a {hora(p.fim)}
+                </Text>
+                <Text style={{ color: '#fff', fontSize: 14 }}>{p.titulo}</Text>
+                {index === 0 && p.descricao ? (
+                  <Text numberOfLines={3} style={{ color: '#bbb', fontSize: 12, marginTop: 2 }}>
+                    {p.descricao}
+                  </Text>
+                ) : null}
+              </View>
+            )}
+          />
+        </View>
+      ) : null}
 
       {estado === 'carregando' || estado === 'reconectando' ? (
         <View style={s.centro} pointerEvents="none">
@@ -168,6 +232,10 @@ export default function Player() {
   );
 }
 
+function hora(seg: number) {
+  return new Date(seg * 1000).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+
 function explicarErro(msg?: string): string {
   const m = (msg ?? '').toLowerCase();
   if (m.includes('403') || m.includes('401')) return 'O provedor recusou o acesso. Confira se a assinatura está ativa.';
@@ -194,7 +262,18 @@ const s = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
   },
   icone: { padding: 4 },
-  titulo: { flex: 1, color: '#fff', fontSize: 16, fontWeight: '600' },
+  titulo: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  programa: { color: '#ddd', fontSize: 12, marginTop: 2 },
+  painel: {
+    position: 'absolute',
+    top: 64,
+    right: 0,
+    bottom: 0,
+    width: 320,
+    maxWidth: '60%',
+    backgroundColor: 'rgba(14,15,19,0.92)',
+    padding: 16,
+  },
   centro: {
     position: 'absolute',
     top: 0,

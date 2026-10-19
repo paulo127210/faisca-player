@@ -1,7 +1,8 @@
 /** Adicionar, atualizar e remover listas; montar a URL final para tocar */
 import { obterBanco } from './db';
 import { baixarTexto, importarTextoM3U, importarXtream, type AoProgredir, type ResumoImportacao } from './importador';
-import type { Playlist } from './repo';
+import { bytesParaTexto, importarEPG, type ResumoEPG } from './epg';
+import { gravarConfig, lerConfig, type Playlist } from './repo';
 import { cofre } from './seguro';
 import {
   aplicarSenha,
@@ -17,7 +18,7 @@ export type NovaLista =
   | { tipo: 'm3u'; nome: string; url?: string; texto?: string }
   | { tipo: 'xtream'; nome: string; servidor: string; usuario: string; senha: string };
 
-export async function adicionarLista(nova: NovaLista, aoProgredir?: AoProgredir): Promise<ResumoImportacao> {
+export async function adicionarLista(nova: NovaLista, aoProgredir?: AoProgredir): Promise<ResumoComGuia> {
   const db = await obterBanco();
 
   // Link get.php de painel Xtream colado como M3U: vira Xtream (senha no cofre, filmes e séries organizados)
@@ -42,7 +43,7 @@ export async function adicionarLista(nova: NovaLista, aoProgredir?: AoProgredir)
     const id = r.lastInsertRowId;
     await cofre.salvarSenha(id, conta.senha);
     try {
-      return await importarXtream(db, id, conta, aoProgredir);
+      return await comGuia(id, await importarXtream(db, id, conta, aoProgredir), aoProgredir);
     } catch (e) {
       await removerLista(id);
       throw e;
@@ -56,7 +57,7 @@ export async function adicionarLista(nova: NovaLista, aoProgredir?: AoProgredir)
   const id = r.lastInsertRowId;
   if (nova.url) await cofre.salvarUrl(id, nova.url.trim());
   try {
-    return await importarTextoM3U(db, id, texto, aoProgredir);
+    return await comGuia(id, await importarTextoM3U(db, id, texto, aoProgredir), aoProgredir);
   } catch (e) {
     await removerLista(id);
     throw e;
@@ -64,17 +65,84 @@ export async function adicionarLista(nova: NovaLista, aoProgredir?: AoProgredir)
 }
 
 /** Baixa de novo e substitui o conteúdo. Favoritos e histórico continuam. */
-export async function atualizarLista(p: Playlist, aoProgredir?: AoProgredir): Promise<ResumoImportacao> {
+export async function atualizarLista(p: Playlist, aoProgredir?: AoProgredir): Promise<ResumoComGuia> {
   const db = await obterBanco();
   if (p.tipo === 'xtream') {
     const senha = await cofre.senha(p.id);
     if (!senha || !p.servidor || !p.usuario)
       throw new Error('Senha desta lista não encontrada. Remova e adicione de novo.');
-    return importarXtream(db, p.id, { servidor: p.servidor, usuario: p.usuario, senha }, aoProgredir);
+    return comGuia(
+      p.id,
+      await importarXtream(db, p.id, { servidor: p.servidor, usuario: p.usuario, senha }, aoProgredir),
+      aoProgredir,
+    );
   }
   const url = await cofre.url(p.id);
   if (!url) throw new Error('Esta lista veio de um arquivo. Para atualizar, adicione o arquivo novo.');
-  return importarTextoM3U(db, p.id, await baixarTexto(url, aoProgredir), aoProgredir);
+  return comGuia(p.id, await importarTextoM3U(db, p.id, await baixarTexto(url, aoProgredir), aoProgredir), aoProgredir);
+}
+
+/* ------------------------------ Guia (EPG) ------------------------------ */
+
+export type ResumoComGuia = ResumoImportacao & { guia: ResumoEPG | null; erroGuia?: string };
+
+/** Depois de importar a lista, tenta baixar o guia. Falha no guia não desfaz a lista. */
+async function comGuia(id: number, r: ResumoImportacao, aoProgredir?: AoProgredir): Promise<ResumoComGuia> {
+  try {
+    aoProgredir?.({ etapa: 'Baixando guia de programação', feitos: 0 });
+    return { ...r, guia: await atualizarGuia(id) };
+  } catch (e) {
+    return { ...r, guia: null, erroGuia: (e as Error).message };
+  }
+}
+
+async function baixarBytes(url: string): Promise<Uint8Array> {
+  const ctrl = new AbortController();
+  const t = setTimeout(() => ctrl.abort(), 180000);
+  try {
+    const r = await fetch(url, { signal: ctrl.signal });
+    if (!r.ok) throw new Error(`O servidor do guia respondeu ${r.status}`);
+    return new Uint8Array(await r.arrayBuffer());
+  } catch (e) {
+    if ((e as Error).name === 'AbortError') throw new Error('O guia demorou mais de 3 minutos para baixar');
+    throw e;
+  } finally {
+    clearTimeout(t);
+  }
+}
+
+/** Baixa e grava o guia da lista. Devolve null quando a lista não tem guia. */
+export async function atualizarGuia(playlistId: number): Promise<ResumoEPG | null> {
+  const db = await obterBanco();
+  const p = await db.getFirstAsync<{ url_epg: string | null }>('SELECT url_epg FROM playlist WHERE id = ?', [
+    playlistId,
+  ]);
+  if (!p?.url_epg) return null;
+  const url = await urlParaTocar(p.url_epg, playlistId);
+  const r = await importarEPG(db, playlistId, bytesParaTexto(await baixarBytes(url)));
+  await gravarConfig(`epg_${playlistId}`, String(Date.now()));
+  return r;
+}
+
+/** Ao abrir o app: atualiza em segundo plano os guias com mais de 12 horas */
+export async function atualizarGuiasAntigos(): Promise<void> {
+  const db = await obterBanco();
+  const pls = await db.getAllAsync<{ id: number }>('SELECT id FROM playlist WHERE url_epg IS NOT NULL', []);
+  for (const { id } of pls) {
+    const ultima = Number((await lerConfig(`epg_${id}`)) ?? 0);
+    if (Date.now() - ultima < 12 * 3600 * 1000) continue;
+    await atualizarGuia(id).catch(() => {});
+  }
+}
+
+/** Nome da lista e link do guia escolhidos pela pessoa */
+export async function editarLista(id: number, nome: string, urlEpg: string | null) {
+  const db = await obterBanco();
+  await db.runAsync('UPDATE playlist SET nome = ?, url_epg = ? WHERE id = ?', [
+    nome.trim() || 'Minha lista',
+    urlEpg?.trim() || null,
+    id,
+  ]);
 }
 
 export async function removerLista(id: number) {

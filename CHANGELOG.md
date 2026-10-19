@@ -1,5 +1,20 @@
 # Histórico de mudanças
 
+## 0.2.0 (19/10/2026)
+
+Etapa 5: guia de programação e controle parental.
+
+- Guia de programação (EPG) em XMLTV e XMLTV compactado (.gz), lido com a biblioteca fflate.
+- Programa no ar na lista de canais; atual, próximo e grade do dia no player.
+- Canais sem tvg-id ligados ao guia pelo nome; ids com sufixo "@HD/@SD" reconhecidos.
+- Guia atualizado depois de importar a lista e, ao abrir o app, quando tem mais de 12 horas.
+- Nova tela Editar lista (nome e link do guia).
+- Controle parental com PIN (hash SHA-256 com sal, via expo-crypto), bloqueio por categoria, trava de 30 s após 5 erros.
+- Categorias com nome adulto entram bloqueadas; escolhas de bloqueio e de categorias ocultas são mantidas ao atualizar a lista.
+- Banco na versão 2: coluna `categoria.bloqueada`, coluna `programa_epg.playlist_id` e novos índices. Quem já tinha a 0.1.0 é migrado sozinho.
+- Link de guia escolhido pela pessoa não é mais substituído pelo do cabeçalho ao atualizar a lista.
+- 35 testes automáticos (eram 18), incluindo as consultas reais das telas.
+
 ## 0.1.0 (19/10/2026)
 
 Primeira versão do código.

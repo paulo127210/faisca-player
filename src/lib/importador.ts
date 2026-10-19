@@ -25,6 +25,23 @@ export interface ResumoImportacao {
 const LOTE = 1000;
 const pausa = () => new Promise<void>((r) => setTimeout(r, 0));
 
+/** Nomes de categoria que já entram bloqueadas pelo controle parental */
+export const CATEGORIA_ADULTA = /(adult|xxx|\+ ?18|18 ?\+|er[oó]tic|porn)/i;
+
+interface Preferencia {
+  oculta: number;
+  bloqueada: number;
+}
+
+/** Escolhas da pessoa (ocultar, bloquear) feitas antes de reimportar, por tipo + nome */
+async function lerPreferencias(db: Banco, playlistId: number): Promise<Map<string, Preferencia>> {
+  const linhas = await db.getAllAsync<Preferencia & { tipo: string; nome: string }>(
+    'SELECT tipo, nome, oculta, bloqueada FROM categoria WHERE playlist_id = ?',
+    [playlistId],
+  );
+  return new Map(linhas.map((l) => [`${l.tipo}|${l.nome}`, { oculta: l.oculta, bloqueada: l.bloqueada }]));
+}
+
 /** Guarda o id de cada categoria já criada para não repetir consultas */
 class Categorias {
   private cache = new Map<string, number>();
@@ -32,12 +49,14 @@ class Categorias {
   constructor(
     private ins: Instrucao,
     private playlistId: number,
+    private previas: Map<string, Preferencia>,
   ) {}
   async id(tipo: TipoConteudo, nome: string, extId: string | null = null): Promise<number> {
     const k = `${tipo}|${nome}`;
     const achado = this.cache.get(k);
     if (achado !== undefined) return achado;
-    const r = await this.ins.executeAsync([this.playlistId, tipo, nome, extId, this.ordem++]);
+    const p = this.previas.get(k) ?? { oculta: 0, bloqueada: CATEGORIA_ADULTA.test(nome) ? 1 : 0 };
+    const r = await this.ins.executeAsync([this.playlistId, tipo, nome, extId, this.ordem++, p.oculta, p.bloqueada]);
     this.cache.set(k, r.lastInsertRowId);
     return r.lastInsertRowId;
   }
@@ -46,7 +65,7 @@ class Categorias {
 async function preparar(db: Banco) {
   return {
     categoria: await db.prepareAsync(
-      'INSERT INTO categoria (playlist_id, tipo, nome, ext_id, ordem) VALUES (?, ?, ?, ?, ?)',
+      'INSERT INTO categoria (playlist_id, tipo, nome, ext_id, ordem, oculta, bloqueada) VALUES (?, ?, ?, ?, ?, ?, ?)',
     ),
     canal: await db.prepareAsync(
       'INSERT INTO canal (playlist_id, categoria_id, nome, nome_busca, logo, url_stream, epg_id, numero, chave) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
@@ -76,7 +95,7 @@ async function limpar(db: Banco, playlistId: number) {
 
 async function gravarTotais(db: Banco, playlistId: number, r: ResumoImportacao) {
   await db.runAsync(
-    `UPDATE playlist SET total_live = ?, total_filmes = ?, total_series = ?, url_epg = COALESCE(?, url_epg),
+    `UPDATE playlist SET total_live = ?, total_filmes = ?, total_series = ?, url_epg = COALESCE(url_epg, ?),
      atualizada_em = datetime('now') WHERE id = ?`,
     [r.live, r.filmes, r.series, r.urlEpg, playlistId],
   );
@@ -94,10 +113,11 @@ export async function importarTextoM3U(
   const resumo: ResumoImportacao = { live: 0, filmes: 0, series: 0, urlEpg: lerCabecalho(texto).urlEpg };
 
   await db.withTransactionAsync(async () => {
+    const previas = await lerPreferencias(db, playlistId);
     await limpar(db, playlistId);
     const ins = await preparar(db);
     try {
-      const cats = new Categorias(ins.categoria, playlistId);
+      const cats = new Categorias(ins.categoria, playlistId, previas);
       const series = new Map<string, number>();
       let n = 0;
 
@@ -210,10 +230,11 @@ export async function importarXtream(
   const resumo: ResumoImportacao = { live: 0, filmes: 0, series: 0, urlEpg: xtream.urlEpg(conta) };
 
   await db.withTransactionAsync(async () => {
+    const previas = await lerPreferencias(db, playlistId);
     await limpar(db, playlistId);
     const ins = await preparar(db);
     try {
-      const cats = new Categorias(ins.categoria, playlistId);
+      const cats = new Categorias(ins.categoria, playlistId, previas);
       const mapa = async (tipo: TipoConteudo, lista: { category_id: string; category_name: string }[]) => {
         const m = new Map<string, number>();
         for (const c of lista ?? [])

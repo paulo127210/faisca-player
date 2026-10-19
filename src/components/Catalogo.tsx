@@ -5,6 +5,8 @@ import { useCallback, useState } from 'react';
 import { Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { categorias, filmes, series, type Categoria, type Filme } from '@/lib/repo';
 import { cores, espaco } from '@/lib/tema';
+import { estaLiberado } from '@/lib/parental';
+import { useCategoriaProtegida } from './Pin';
 import { Carregando, Chips, estilos, Miniatura, Vazio } from './ui';
 
 export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
@@ -15,13 +17,15 @@ export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
   const [cats, setCats] = useState<Categoria[] | null>(null);
   const [ativa, setAtiva] = useState<number | null>(null);
   const [itens, setItens] = useState<Filme[] | null>(null);
+  const { escolher, janela, versao } = useCategoriaProtegida(setAtiva);
 
   useFocusEffect(
     useCallback(() => {
       categorias(tipo)
         .then(setCats)
         .catch(() => setCats([]));
-    }, [tipo]),
+      if (versao && !estaLiberado()) setAtiva(null); // bloquearam de novo: volta para "Todos"
+    }, [tipo, versao]),
   );
 
   useFocusEffect(
@@ -34,7 +38,7 @@ export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
       return () => {
         vivo = false;
       };
-    }, [tipo, ativa]),
+    }, [tipo, ativa, versao]),
   );
 
   if (cats && cats.length === 0)
@@ -50,7 +54,8 @@ export function Catalogo({ tipo }: { tipo: 'filme' | 'serie' }) {
 
   return (
     <View style={estilos.tela}>
-      <Chips itens={[{ id: null, nome: 'Todos' }, ...(cats ?? [])]} ativo={ativa} aoEscolher={setAtiva} />
+      {janela}
+      <Chips itens={[{ id: null, nome: 'Todos' }, ...(cats ?? [])]} ativo={ativa} aoEscolher={escolher} />
       {itens === null ? (
         <Carregando />
       ) : (

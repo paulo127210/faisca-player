@@ -117,15 +117,15 @@ export function Miniatura({
   );
 }
 
-/** Lista horizontal de categorias (chips) */
-export function Chips<T extends { id: number | null; nome: string }>({
+/** Lista horizontal de categorias (chips). Categorias bloqueadas mostram um cadeado. */
+export function Chips<T extends { id: number | null; nome: string; bloqueada?: number }>({
   itens,
   ativo,
   aoEscolher,
 }: {
   itens: T[];
   ativo: number | null;
-  aoEscolher: (id: number | null) => void;
+  aoEscolher: (id: number | null, bloqueada: boolean) => void;
 }) {
   return (
     <ScrollView
@@ -137,9 +137,12 @@ export function Chips<T extends { id: number | null; nome: string }>({
       {itens.map((c) => (
         <Pressable
           key={String(c.id)}
-          onPress={() => aoEscolher(c.id)}
-          style={() => [estilos.chip, c.id === ativo && estilos.chipAtivo]}
+          onPress={() => aoEscolher(c.id, !!c.bloqueada)}
+          style={() => [estilos.chip, c.id === ativo && estilos.chipAtivo, { flexDirection: 'row', gap: 6 }]}
         >
+          {c.bloqueada ? (
+            <Ionicons name="lock-closed" size={13} color={c.id === ativo ? '#fff' : cores.textoFraco} />
+          ) : null}
           <Text numberOfLines={1} style={[estilos.chipTexto, c.id === ativo && { color: '#fff' }]}>
             {c.nome}
           </Text>
