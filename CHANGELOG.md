@@ -9,6 +9,7 @@ Etapa 6: TV e APK.
 - Ícone próprio do app (faísca branca em fundo laranja) e ícone adaptativo do Android.
 - Compilação automática do APK no GitHub Actions (`.github/workflows/apk-android.yml`), com testes antes do build e publicação na página Releases.
 - APK gerado para armeabi-v7a e arm64-v8a, que cobrem celulares e TV boxes.
+- Segunda compilação pela Expo (EAS Build) na conta paulo127210, com o fluxo `apk-expo.yml`; precisa do segredo EXPO_TOKEN no GitHub.
 - O player VLC reserva foi adiado: o player nativo já abre HLS, TS e MP4, que são a grande maioria das listas.
 
 ## 0.2.0 (19/10/2026)

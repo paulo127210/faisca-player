@@ -18,7 +18,9 @@ Versão atual: **1.0.0** (etapas 1 a 6 concluídas; o player VLC reserva ficou p
 
 O jeito principal é automático: a cada envio para a branch `main` do GitHub, o arquivo `.github/workflows/apk-android.yml` roda os testes, compila o APK nos servidores do GitHub e publica o arquivo na página **Releases** do repositório, pronto para baixar no celular. Não precisa de conta Expo nem de Android Studio.
 
-Também é possível gerar pela Expo (EAS):
+Também há uma segunda compilação, feita pela Expo (EAS) na conta `paulo127210`, pelo arquivo `.github/workflows/apk-expo.yml`. Ela precisa do segredo `EXPO_TOKEN` cadastrado no repositório do GitHub (Settings > Secrets and variables > Actions). O link do build na Expo e do APK aparece na página Releases, com o nome "Expo".
+
+Para gerar pela Expo direto do computador:
 
 5. **Conta gratuita na Expo** ([expo.dev](https://expo.dev)). O APK é compilado na nuvem da Expo, sem precisar do Android Studio.
 6. Rodar `npx eas-cli@latest build -p android --profile preview` (o primeiro build pede login e cria o projeto na conta).

@@ -1,0 +1,77 @@
+# Envia o app para a Expo (EAS Build) e gera o APK lá, na conta paulo127210.
+# Precisa do segredo EXPO_TOKEN no repositório (Settings > Secrets and variables > Actions).
+# Sem o segredo, o fluxo só avisa e termina sem erro.
+name: APK na Expo
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: apk-expo
+  cancel-in-progress: false
+
+jobs:
+  eas:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - name: Conferir chave da Expo
+        id: chave
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+        run: |
+          if [ -z "$EXPO_TOKEN" ]; then
+            echo "Segredo EXPO_TOKEN ainda não cadastrado. Nada a fazer." >> "$GITHUB_STEP_SUMMARY"
+            echo "ok=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "ok=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v4
+        if: steps.chave.outputs.ok == 'true'
+
+      - uses: actions/setup-node@v4
+        if: steps.chave.outputs.ok == 'true'
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: expo/expo-github-action@v8
+        if: steps.chave.outputs.ok == 'true'
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Instalar dependências
+        if: steps.chave.outputs.ok == 'true'
+        run: npm ci
+
+      - name: Ligar ao projeto na Expo (cria na primeira vez)
+        if: steps.chave.outputs.ok == 'true'
+        run: eas init --non-interactive --force
+
+      - name: Compilar APK na Expo
+        if: steps.chave.outputs.ok == 'true'
+        id: build
+        run: |
+          eas build --platform android --profile preview --non-interactive --wait --json > build.json
+          cat build.json
+          echo "id=$(node -p "require('./build.json')[0].id")" >> "$GITHUB_OUTPUT"
+          echo "apk=$(node -p "require('./build.json')[0].artifacts.buildUrl")" >> "$GITHUB_OUTPUT"
+          echo "versao=$(node -p "require('./app.json').expo.version")" >> "$GITHUB_OUTPUT"
+
+      - name: Publicar os links da Expo
+        if: steps.chave.outputs.ok == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: expo-v${{ steps.build.outputs.versao }}-${{ github.run_number }}
+          name: Expo ${{ steps.build.outputs.versao }} (build ${{ github.run_number }})
+          make_latest: false
+          body: |
+            Página do build na Expo: https://expo.dev/accounts/paulo127210/projects/faisca-player/builds/${{ steps.build.outputs.id }}
+            APK gerado pela Expo: ${{ steps.build.outputs.apk }}
