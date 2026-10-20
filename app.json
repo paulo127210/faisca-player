@@ -56,6 +56,11 @@
     "experiments": {
       "typedRoutes": false
     },
-    "owner": "paulo127210"
+    "owner": "paulo127210",
+    "extra": {
+      "eas": {
+        "projectId": "86c30276-0dab-469e-9de7-e3f7f7305a1e"
+      }
+    }
   }
 }
